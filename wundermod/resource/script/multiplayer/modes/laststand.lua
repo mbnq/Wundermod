@@ -16,6 +16,47 @@ local AttackUnitSpawnWaitTime = 0.5 * 1000 -- 0.5s (ms)
 local OrderRotationPeriod = 2.5 * 60000 -- 2:30 min (ms)
 local botRole
 
+local function CheckAndSelfDestruct(squad)
+	-- 1. Blokada: tylko AI (nie cz³owiek), tylko atakuj¹cy
+	if not BotApi.Instance.isBot or botRole ~= "attacker" then 
+		return 
+	end
+	
+	-- 2. Sprawdzenie w³aœciciela
+	if BotApi.Scene:GetSquadOwner(squad) ~= BotApi.Instance.playerId then
+		return
+	end
+
+	-- 3. Sprawdzenie za³ogi: musi byæ min. 1 osoba
+	if BotApi.Scene:GetSquadUnitCount(squad) == 0 then
+		return
+	end
+
+	-- 4. Blokada przed dublowaniem timerów
+	if BotApi.Scene:IsSquadTagged(squad, "pending_destruction") then
+		return
+	end
+
+	-- 5. Warunki techniczne
+	local isImmobilized = BotApi.Scene:IsSquadTagged(squad, "broken_engine") or 
+	                      BotApi.Scene:IsSquadTagged(squad, "broken_track")
+
+	local isDisarmed = BotApi.Scene:IsSquadTagged(squad, "broken_gun") or 
+	                   BotApi.Scene:IsSquadTagged(squad, "no_ammo")
+
+	if isImmobilized and isDisarmed then
+		BotApi.Scene:AddSquadTag(squad, "pending_destruction")
+		
+		-- OpóŸnienie 10 sekund
+		BotApi.Events:SetQuantTimer(function()
+			if BotApi.Scene:IsSquadExists(squad) and BotApi.Scene:GetSquadUnitCount(squad) > 0 then
+				BotApi.Commands:Destroy(squad)
+				print("Wundermod: useless AI vehicle autodestructed")
+			end
+		end, 10000)
+	end
+end
+
 local function setBotRole()
 	if team == "a" then
         botRole = "defender"
@@ -240,8 +281,15 @@ function OnGameQuant()
 	TrySpawnUnit()
 
 	local waypoints = BotApi.Scene.Waypoints
-	if #waypoints == 0 then
-		for i, squad in pairs(BotApi.Scene.Squads) do
+	
+	-- Pêtla dzia³a zawsze dla wszystkich oddzia³ów bota
+	for i, squad in pairs(BotApi.Scene.Squads) do
+		
+		-- WYWO£ANIE NOWEJ FUNKCJI
+		CheckAndSelfDestruct(squad)
+
+		-- Logika ruchu: wykonaj tylko jeœli nie ma waypointów na mapie
+		if #waypoints == 0 then
 			if not Context.SquadTimers[squad] then
 				SetSquadOrder(CaptureFlag, squad, OrderRotationPeriod)
 			end
