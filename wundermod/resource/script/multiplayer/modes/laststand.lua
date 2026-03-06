@@ -32,26 +32,27 @@ local function CheckAndSelfDestruct(squad)
 		return
 	end
 
+	print("Wundermod: useless AI vehicle Squad ID: " .. squad)
+
 	-- 4. Blokada przed dublowaniem timerów
 	if BotApi.Scene:IsSquadTagged(squad, "pending_destruction") then
 		return
 	end
 
 	-- 5. Warunki techniczne
-	local isImmobilized = BotApi.Scene:IsSquadTagged(squad, "broken_engine") or 
-	                      BotApi.Scene:IsSquadTagged(squad, "broken_track")
+	local isImmobilized = BotApi.Scene:IsSquadTagged(squad, "broken_engine") or BotApi.Scene:IsSquadTagged(squad, "broken_track") or BotApi.Scene:IsSquadTagged(squad, "broken_wheel")
 
-	local isDisarmed = BotApi.Scene:IsSquadTagged(squad, "broken_gun") or 
-	                   BotApi.Scene:IsSquadTagged(squad, "no_ammo")
+	local isDisarmed = BotApi.Scene:IsSquadTagged(squad, "broken_gun") or BotApi.Scene:IsSquadTagged(squad, "no_ammo")
 
 	if isImmobilized and isDisarmed then
 		BotApi.Scene:AddSquadTag(squad, "pending_destruction")
+		print("Wundermod: useless AI vehicle pending destruction Squad ID: " .. squad)
 		
 		-- OpóŸnienie 10 sekund
 		BotApi.Events:SetQuantTimer(function()
 			if BotApi.Scene:IsSquadExists(squad) and BotApi.Scene:GetSquadUnitCount(squad) > 0 then
 				BotApi.Commands:Destroy(squad)
-				print("Wundermod: useless AI vehicle autodestructed")
+				print("Wundermod: useless AI vehicle autodestructed. Squad ID: " .. squad)
 			end
 		end, 10000)
 	end
