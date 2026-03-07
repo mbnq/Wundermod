@@ -1,3 +1,13 @@
+--[[
+
+    Wundermod
+
+    www.mbnq.pl 2026
+    https://mbnq.pl/
+    https://steamcommunity.com/sharedfiles/filedetails/?id=3670142181
+
+]]--
+
 require([[/script/multiplayer/modes/utility]])
 
  -- Time from last purchase AI will wait before attempting to buy a new unit.
@@ -15,48 +25,7 @@ local AttackUnitSpawnWaitTime = 0.5 * 1000 -- 0.5s (ms)
 -- Time delay for units to get a new move order after spawn move order. Loops.
 local OrderRotationPeriod = 2.5 * 60000 -- 2:30 min (ms)
 local botRole
-
-local function CheckAndSelfDestruct(squad)
-	-- 1. Blokada: tylko AI (nie cz³owiek), tylko atakuj¹cy
-	if not BotApi.Instance.isBot or botRole ~= "attacker" then 
-		return 
-	end
-	
-	-- 2. Sprawdzenie w³aœciciela
-	if BotApi.Scene:GetSquadOwner(squad) ~= BotApi.Instance.playerId then
-		return
-	end
-
-	-- 3. Sprawdzenie za³ogi: musi byæ min. 1 osoba
-	if BotApi.Scene:GetSquadUnitCount(squad) == 0 then
-		return
-	end
-
-	print("Wundermod: useless AI vehicle Squad ID: " .. squad)
-
-	-- 4. Blokada przed dublowaniem timerów
-	if BotApi.Scene:IsSquadTagged(squad, "pending_destruction") then
-		return
-	end
-
-	-- 5. Warunki techniczne
-	local isImmobilized = BotApi.Scene:IsSquadTagged(squad, "broken_engine") or BotApi.Scene:IsSquadTagged(squad, "broken_track") or BotApi.Scene:IsSquadTagged(squad, "broken_wheel")
-
-	local isDisarmed = BotApi.Scene:IsSquadTagged(squad, "broken_gun") or BotApi.Scene:IsSquadTagged(squad, "no_ammo")
-
-	if isImmobilized and isDisarmed then
-		BotApi.Scene:AddSquadTag(squad, "pending_destruction")
-		print("Wundermod: useless AI vehicle pending destruction Squad ID: " .. squad)
-		
-		-- OpóŸnienie 10 sekund
-		BotApi.Events:SetQuantTimer(function()
-			if BotApi.Scene:IsSquadExists(squad) and BotApi.Scene:GetSquadUnitCount(squad) > 0 then
-				BotApi.Commands:Destroy(squad)
-				print("Wundermod: useless AI vehicle autodestructed. Squad ID: " .. squad)
-			end
-		end, 10000)
-	end
-end
+isEvacDefender = isEvacDefender or false
 
 local function setBotRole()
 	if team == "a" then
@@ -282,15 +251,8 @@ function OnGameQuant()
 	TrySpawnUnit()
 
 	local waypoints = BotApi.Scene.Waypoints
-	
-	-- Pêtla dzia³a zawsze dla wszystkich oddzia³ów bota
-	for i, squad in pairs(BotApi.Scene.Squads) do
-		
-		-- WYWO£ANIE NOWEJ FUNKCJI
-		CheckAndSelfDestruct(squad)
-
-		-- Logika ruchu: wykonaj tylko jeœli nie ma waypointów na mapie
-		if #waypoints == 0 then
+	if #waypoints == 0 then
+		for i, squad in pairs(BotApi.Scene.Squads) do
 			if not Context.SquadTimers[squad] then
 				SetSquadOrder(CaptureFlag, squad, OrderRotationPeriod)
 			end
@@ -318,15 +280,17 @@ function IsSquadInScript(squad)
         return true
     end
     if BotApi.Scene:IsSquadTagged(squad, "_lua_alert") then
-        if botRole == "attacker" then
-            local currentTime = BotApi.Instance.gameTime or 0
-            if not LastAttackOrderTime[squad] or (currentTime - LastAttackOrderTime[squad] > 5000) then
+        if botRole == "attacker" or not isEvacDefender then
+            local currentTime = BotApi.Instance.gameTime
+
+            if not LastAttackOrderTime[squad] or (currentTime - LastAttackOrderTime[squad] > 10000) then
                 BotApi.Commands:SeekAndDestroy(squad)
-                LastAttackOrderTime[squad] = currentTime 
+                LastAttackOrderTime[squad] = currentTime
             end
         end
         return true
     end
+    return false
 end
 
 	-- NOTE: Returns true if squad tagged "_lua_ignore" for general ignore.
@@ -340,7 +304,7 @@ function CaptureFlag(squad)
 	local flag = GetFlagToCapture(BotApi.Scene.Flags, getDefaultFlagPriority, GetFlagPosition)
 
 	if not flag or botRole == "defender" then
-		--if printDebug then print("Print: No Flags so SeekAndDestroy by squad", squad, "Player#",BotApi.Instance.playerIdon, "Team", team) end
+		--if printDebug then print("Print: No Flags so SeekAndDestroy by squad", squad, "Player#",BotApi.Instance.playerId, "Team", team) end
 		BotApi.Commands:SeekAndDestroy(squad)
 		return
 	end

@@ -1,3 +1,13 @@
+--[[
+
+    Wundermod
+
+    www.mbnq.pl 2026
+    https://mbnq.pl/
+    https://steamcommunity.com/sharedfiles/filedetails/?id=3670142181
+
+]]--
+
 -- Utility variables for various game modes
 
 printDebug = false
