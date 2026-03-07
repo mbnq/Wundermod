@@ -99,8 +99,8 @@ function GetUnitToSpawn(units)
 
 	--if printDebug then print("player#".. BotApi.Instance.playerId.. " Unit, TTS, Min TTS") end
 	for i, unit in pairs(units) do
-		local min_team = unit.min_team  -- not used
-		local min_income = unit.min_income -- not used
+		local min_team = unit.min_team
+		local min_income = unit.min_income
 		local tts = BotApi.Commands:TimeToSpawnUnit(unit.unit)
 		local min_tts = currentUnitSpawnWaitTime + gameModeSpawnTimer
 		local available = BotApi.Commands:IsUnitAvailable(unit.unit)
@@ -298,6 +298,7 @@ function IsSquadToIgnore(squad)
 	if BotApi.Scene:IsSquadTagged(squad, "_lua_ignore") then
 		return true
 	end
+	return false
 end
 
 function CaptureFlag(squad)
