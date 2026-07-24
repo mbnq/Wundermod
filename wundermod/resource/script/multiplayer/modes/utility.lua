@@ -61,7 +61,8 @@ Context = {
 	SpawnInfo = nil,
 	SpawnWait = {
 		CooldownTimer = nil,
-		WaitTimer = nil
+		WaitTimer = nil,
+		RetryPendingUnit = false
 	},
 	SquadTimers = {}
 }
@@ -91,6 +92,12 @@ function KillSpawnWaitTimer()
 		BotApi.Events:KillQuantTimer(Context.SpawnWait.WaitTimer)
 		Context.SpawnWait.WaitTimer = nil
 	end
+	Context.SpawnWait.RetryPendingUnit = false
+end
+
+-- Function to check how far forward unit selection looks when filtering by TimeToSpawnUnit
+function GetUnitSelectionTTSLimit()
+	return GetCurrentSpawnWaitTime()
 end
 
 -- PIter class for managing unit purchases
@@ -319,6 +326,9 @@ function UpdateUnitToSpawn(purchase)
 	Context.SpawnInfo = GetNextUnitToSpawn(purchase)
 end
 
+function GameModeSpawnUnit(unit, maxSquadSize)
+	return BotApi.Commands:Spawn(unit, maxSquadSize)
+end										  
 -- Called OnGameStart()
 function OnGameStartUtility(purchasesModuleSuffix)
     print("Print: AI Bot is player#" .. BotApi.Instance.playerId .. ", nation " .. BotApi.Instance.army .. ", on team " .. team .. " which has " .. teamSize .. " player(s)")
@@ -346,8 +356,9 @@ function OnGameStartUtility(purchasesModuleSuffix)
     -- Set up context
     Context.Purchase = PIter:new(purchases)
 
-    -- Update and set cooldown
-    UpdateUnitToSpawn(Context.Purchase)
+    -- Update and set cooldown. unit selection now happens when the bot is ready to spawn
+    Context.SpawnInfo = nil
+									   
     SetSpawnCooldownTimer()
 end
 
@@ -357,12 +368,37 @@ function TrySpawnUnit()
 		return
 	end
 
+	if Context.SpawnWait.WaitTimer then
+		return
+	end
+
 	if not BotApi.Commands:CanSpawn() then
 		return
 	end
 
-	if not Context.SpawnInfo then
+	if spawningUnit then
+		if OnUnitPurchased then -- used for conquest
+			OnUnitPurchased()
+		elseif enableWaveCounter then
+			WaveUnitCounter()
+		end
+
+		KillSpawnWaitTimer()
+		Context.SpawnInfo = nil
+		SetSpawnCooldownTimer()
+		spawningUnit = nil
+		return
+	end
+
+	local retryPendingUnit = Context.SpawnWait.RetryPendingUnit
+	Context.SpawnWait.RetryPendingUnit = false
+
+	if not retryPendingUnit or not Context.SpawnInfo then
+		-- Updates the unit selection at the moment bot is ready to buy, instead of immediately after previous purchase
 		UpdateUnitToSpawn(Context.Purchase)
+	end
+
+	if not Context.SpawnInfo then
 		return
 	end
 
@@ -372,23 +408,23 @@ function TrySpawnUnit()
 	if not BotApi.Commands:IsUnitAvailable(unit) then
 		print("Print: !!WARNING!! player#".. BotApi.Instance.playerId.. " tried to purchase: ".. unit .." which is not available")
 		KillSpawnWaitTimer()
-		UpdateUnitToSpawn(Context.Purchase)
+		Context.SpawnInfo = nil
 		return
 	end
 	--]]
 
-	if spawningUnit then
-        if enableWaveCounter then 
-            WaveUnitCounter()
-        end
-		KillSpawnWaitTimer()
-		SetSpawnCooldownTimer()
-		UpdateUnitToSpawn(Context.Purchase)
-		spawningUnit = nil
-		return
-	end
+					 
+								  
+							 
+		   
+					  
+						 
+									 
+					
+		
+	
 
-	if BotApi.Commands:Spawn(unit, MaxSquadSize) then
+	if GameModeSpawnUnit(unit, MaxSquadSize) then
 		spawningUnit = true
 		return
 	end
@@ -396,14 +432,18 @@ function TrySpawnUnit()
 	local currentUnitSpawnWaitTime = GetCurrentSpawnWaitTime()
 	---[[ -- TODO: Move to GetUnitToSpawn()
 	local tts = BotApi.Commands:TimeToSpawnUnit(unit)
-	local min_tts = currentUnitSpawnWaitTime + gameModeSpawnTimer
+	local min_tts = GetUnitSelectionTTSLimit()
 	if tts > min_tts then
 		print("Print: !!WARNING!! player#".. BotApi.Instance.playerId.. " tried to purchase: ".. unit .." but the TTS (unit timer) is greater than UnitSpawnWaitTime ".. (tts / 1000) .."s verses ".. (min_tts / 1000) .."s")
 		KillSpawnWaitTimer()
-		UpdateUnitToSpawn(Context.Purchase)
+		Context.SpawnInfo = nil
 		return
 	end
 	--]]
+
+	if retryPendingUnit then
+		Context.SpawnInfo = nil
+	end
 
 	-- TODO: Move to GetUnitToSpawn()
 	if not Context.SpawnWait.WaitTimer then
@@ -414,16 +454,16 @@ function TrySpawnUnit()
 		Context.SpawnWait.WaitTimer = BotApi.Events:SetQuantTimer(
 			function()
 				Context.SpawnWait.WaitTimer = nil
-				UpdateUnitToSpawn(Context.Purchase)
+				Context.SpawnWait.RetryPendingUnit = Context.SpawnInfo ~= nil
 			end, currentUnitSpawnWaitTime + 1000)
 	end
-	local spawningUnit = nil
+						 
 end
 --]=]
 function OnGameStop()
 	KillSpawnCooldownTimer()
 	KillSpawnWaitTimer()
-    LastAttackOrderTime = {}
+							
 
 	for squad, timer in pairs(Context.SquadTimers) do
 		if timer then

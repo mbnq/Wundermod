@@ -58,6 +58,19 @@ function GameModeSpawnCooldown()
 	return math.random(SpawnCooldownTime.Min, SpawnCooldownTime.Max)
 end
 
+local function setVarsInMissionScript()
+	local botDifficulty = BotApi.Instance.difficulty
+ 	local difficultyVar = { easy = 1, normal = 2, hard = 3, heroic = 4 }
+	-- print("Team", BotApi.Instance.team, "SpawnPoint", BotApi.Instance.spawnPointName)
+
+	if team == "b" and difficultyVar[botDifficulty] > 3 then
+		BotApi.Scene:SetVar("heroic_attacker_exist", 1)
+		 if printDebug then
+			local botAttackerSpawn = tonumber(string.sub(BotApi.Instance.spawnPointName, 2, 2))
+			print("LS Attacking Bot Team: " .. team .. " botAttackerSpawn: " .. botAttackerSpawn .. " is Heroic.")
+		 end
+	end
+end
 flagLocationMap = {
 	base_flag_a = function(side) return side == 'a' and FlagLocation.EvacFriendlyBase or FlagLocation.EnemyBase end,
 	["default"] = 1,
@@ -102,7 +115,7 @@ function GetUnitToSpawn(units)
 		local min_team = unit.min_team
 		local min_income = unit.min_income
 		local tts = BotApi.Commands:TimeToSpawnUnit(unit.unit)
-		local min_tts = currentUnitSpawnWaitTime + gameModeSpawnTimer
+		local min_tts = GetUnitSelectionTTSLimit() --currentUnitSpawnWaitTime + gameModeSpawnTimer
 		local available = BotApi.Commands:IsUnitAvailable(unit.unit)
 		
 		if not min_income then min_income = -1 end
@@ -242,6 +255,7 @@ function GetUnitToSpawn(units)
 end
 
 function OnGameStart()
+	setVarsInMissionScript()
 	print("Wundermod: Initialized! ID:34")
     setBotRole()
     OnGameStartUtility(BotApi.Instance.unitMode)
