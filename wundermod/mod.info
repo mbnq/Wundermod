@@ -1,8 +1,8 @@
 {mod
 	{name "WunderMod"}
 	;{tags "list of tags"}
-	{desc "0.37"}
+	{desc "0.40"}
 	{minGameVersion "1.61"}
-	{maxGameVersion "1.64"}
+	{maxGameVersion "1.65"}
 	;{require "template_mod_dependency_name"}
 }
